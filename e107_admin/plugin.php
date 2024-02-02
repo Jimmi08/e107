@@ -822,7 +822,7 @@ class plugin_ui extends e_admin_ui
 					'label'			=> EPL_ADLAN_57,
 					'helpText'		=> EPL_ADLAN_58,
 					'itemList'		=> array(1=>LAN_YES,0=>LAN_NO),
-					'itemDefault' 	=> 1
+					'itemDefault' 	=> 0
 			);
 
 			if ($userclasses)
@@ -832,7 +832,7 @@ class plugin_ui extends e_admin_ui
 					'preview'		=> $userclasses,
 					'helpText'		=> EPL_ADLAN_79,
 					'itemList'		=> array(1=>LAN_YES,0=>LAN_NO),
-					'itemDefault' 	=> 1
+					'itemDefault' 	=> 0
 				);
 			}
 
@@ -866,7 +866,7 @@ class plugin_ui extends e_admin_ui
 					'preview'		=> $iconText,
 					'helpText'		=> EPL_ADLAN_79,
 					'itemList'		=> array(1=>LAN_YES,0=>LAN_NO),
-					'itemDefault' 	=> 1
+					'itemDefault' 	=> 0
 				);
 
 
