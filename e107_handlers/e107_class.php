@@ -15,6 +15,7 @@
 if (!defined('e107_INIT')) { exit; }
 
 
+
 /**
  *
  * @package     e107
@@ -153,6 +154,8 @@ class e107
 
 	protected static $_breadcrumb = array();
 
+
+
 	/**
 	 * Core handlers array
 	 * For new/missing handler add
@@ -268,6 +271,16 @@ class e107
 		// Core plugin auto-loaders.
 		'pageHelper'                     => '{e_PLUGIN}page/includes/pageHelper.php'
 	);
+
+	/**
+	 * List of core classes using the 'e107' namespace.
+	 */
+	protected static $_named_handlers = [
+		'override' => true,
+
+	];
+
+
 
 	/**
 	 * Overload core handlers array
@@ -597,7 +610,7 @@ class e107
 
 		if(empty($e107_config_override['site_path']))
 		{
-			$this->site_path = $this->makeSiteHash($e107_config_mysql_info['mySQLdefaultdb'], $e107_config_mysql_info['mySQLprefix']);
+			$this->site_path = $this->makeSiteHash($e107_config_mysql_info['defaultdb'], $e107_config_mysql_info['prefix']);
 		}
 
 		// Set default folder (and override paths) if missing from e107_config.php
@@ -990,7 +1003,9 @@ class e107
 	 */
 	public static function getHandlerPath($class_name, $parse_path = true)
 	{
+
 		$ret = isset(self::$_known_handlers[$class_name]) ? self::$_known_handlers[$class_name] : null;
+
 		if($parse_path && $ret)
 		{
 			$ret = self::getParser()->replaceConstants($ret);
@@ -1032,6 +1047,11 @@ class e107
 	public static function isHandler($class_name)
 	{
 		return isset(self::$_known_handlers[$class_name]);
+	}
+
+	public static function isHandlerNamespaced($className)
+	{
+		return isset(self::$_named_handlers[$className]) ? '\\e107\\'.$className : false;
 	}
 
 	/**
@@ -1132,6 +1152,11 @@ class e107
 			}
 		}
 
+		if($named = self::isHandlerNamespaced($class_name))
+		{
+			$class_name = $named;
+		}
+
 		if($path && is_string($path) && !class_exists($class_name, false))
 		{
 			global $_E107;
@@ -1148,9 +1173,21 @@ class e107
 			// remove the need for external function.
 			//e107_require_once() is available without class2.php. - see core_functions.php
 		}
+
 		if(class_exists($class_name, false))
 		{
-			self::setRegistry($id, new $class_name($vars));
+
+			try
+			{
+				$cls = is_null($vars) ? new $class_name() : new $class_name($vars);
+			}
+			catch (Exception $e)
+			{
+			   trigger_error($e->getMessage());
+			   return false;
+			}
+
+			self::setRegistry($id, $cls);
 		}
 
 		return self::getRegistry($id);
@@ -1840,7 +1877,7 @@ class e107
         {
             $fileInspector->loadDatabase();
         }
-        catch (Exception $e)
+        catch (Throwable $e)
         {
             // TODO: LAN
             self::getMessage()->addWarning(
@@ -1939,7 +1976,7 @@ class e107
 	/**
 	 * Retrieve override handler singleton object
 	 *
-	 * @return override
+	 * @return e107\override
 	 */
 	public static function getOverride()
 	{
@@ -5487,10 +5524,18 @@ class e107
 	 */
 	public function set_urls_deferred()
 	{
+		$siteurl = self::getPref('siteurl');
+		$configured_host = parse_url($siteurl, PHP_URL_HOST);
+
 		if(self::isCli())
 		{
-			define('SITEURL', self::getPref('siteurl'));
+			define('SITEURL', $siteurl);
 			define('SITEURLBASE', rtrim(SITEURL,'/'));
+		}
+		elseif(!empty($configured_host) && strpos($siteurl,'http')!== false && $configured_host !== $_SERVER['HTTP_HOST'] && substr($_SERVER['HTTP_HOST'], - strlen('.' . $configured_host)) !== ('.' . $configured_host))
+		{
+			die('Site Configuration Issue Detected. Please contact your webmaster.');
+			error_log('The configured siteurl in your preferences does not match the HTTP_HOST: '.$_SERVER['HTTP_HOST']);
 		}
 		else
 		{
@@ -5932,11 +5977,17 @@ class e107
 			return;
 		}
 
+
+
 		$levels[0] = e_HANDLER;
 		$classPath = implode('/', $levels).'.php';
 		if (is_file($classPath) && is_readable($classPath))
 		{
 			include($classPath);
+		}
+		elseif($filename = self::getHandlerPath($className))
+		{
+			include($filename);
 		}
 	}
 

@@ -3235,7 +3235,10 @@ class e_form
 		}
 
 		$ret = '';
-		$ret .= '<i class="admin-ui-help-tip far fa-question-circle"><!-- --></i>';
+	//	$ret .= '<i class="admin-ui-help-tip far fa-question-circle"><!-- --></i>';
+
+		$ret .= $this->tp->toGlyph('far-question-circle', ['class'=>'admin-ui-help-tip', 'placeholder'=>'<!-- -->']);
+
 		$ret .= '<div class="field-help" data-placement="left" style="display:none">'.defset($text,$text).'</div>'; // display:none to prevent visibility during page load. 
 
 		return $ret;
@@ -3572,7 +3575,8 @@ var_dump($select_options);*/
 	 */
 	public function optgroup_open($label, $disabled = false, $options = null)
 	{
-		return "<optgroup class='optgroup ".varset($options['class'])."' label='{$label}'".($disabled ? " disabled='disabled'" : '').">\n";
+		$unique = 'optgroup-'.$this->name2id($label);
+		return "<optgroup class='optgroup $unique ".varset($options['class'])."' label='{$label}'".($disabled ? " disabled='disabled'" : '').">\n";
 	}
 
 	/**
@@ -4532,16 +4536,19 @@ var_dump($select_options);*/
 	public function columnSelector($columnsArray, $columnsDefault = array(), $id = 'column_options')
 	{
 		$columnsArray = array_filter($columnsArray);
+		$tabs = []; 
 
-		try
+		if($adminUI = e107::getAdminUI())
 		{
-			$tabs = e107::getAdminUI()->getController()->getTabs();
+			try
+			{
+				$tabs = $adminUI->getController()->getTabs();
+			}
+			catch (Exception $e)
+			{
+			   // do something
+			}
 		}
-		catch (Exception $e)
-		{
-		   // do something
-		}
-
 
 		
 	// navbar-header nav-header
@@ -5072,7 +5079,7 @@ var_dump($select_options);*/
 			$options['pk'] = $pid;
 		}
 
-		$title = varset($options['title'], (LAN_EDIT . ' ' . $fieldName));
+		$title = varset($options['title'], (LAN_EDIT . ' ' . defset($fieldName,$fieldName)));
 		$class = varset($options['class']);
 
 		unset($options['title']);

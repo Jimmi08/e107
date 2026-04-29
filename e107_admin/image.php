@@ -40,6 +40,12 @@ if(varset($_GET['action']) === 'youtube' )
 e107::js('core', 'plupload/plupload.full.min.js', 'jquery', 2);
 e107::css('core', 'plupload/jquery.plupload.queue/css/jquery.plupload.queue.css', 'jquery');
 e107::js('core', 'plupload/jquery.plupload.queue/jquery.plupload.queue.min.js', 'jquery', 2);
+	$plUpload = 'plupload/i18n/' . e_LAN . '.js';
+
+	if(e_LAN != 'en' && file_exists(e_WEB_JS . $plUpload))
+	{
+		e107::js('footer', e_WEB_JS . $plUpload, 'jquery', 5);
+	}
 e107::js('core', 'core/mediaManager.js', 'jquery',5);
 // issue #3051 Preview url is wrong when target page is a plugin
 // Using this variable to check for the plugins directory and replace with empty space in case of...
@@ -133,13 +139,14 @@ class media_admin extends e_admin_dispatcher
 		'main/grid'			=> array('caption'=> LAN_IMA_M_01, 'perm' => 'A'),
 	//	'main/create' 		=> array('caption'=> "Add New Media", 'perm' => 'A'), // Should be handled in Media-Import.
 		'main/import' 		=> array('caption'=> LAN_IMA_M_02, 'perm' => 'A|A1'),
-			'divider/01'        => array('divider'=>true),
-		'cat/list' 			=> array('caption'=> LAN_IMA_M_03, 'perm' => 'A|A2'),
-		'cat/create' 		=> array('caption'=> LAN_IMA_M_04, 'perm' => 'A|A2'), // is automatic.
+
+		'divider/01'        => array('divider'=>true, 'perm'=>'A2'),
+		'cat/list' 			=> array('caption'=> LAN_IMA_M_03, 'perm' => 'A2'),
+		'cat/create' 		=> array('caption'=> LAN_IMA_M_04, 'perm' => 'A2'), // is automatic.
 	//	'main/settings' 	=> array('caption'=> LAN_PREFS, 'perm' => 'A'), // legacy
-		'divider/02'        => array('divider'=>true),
-		'main/prefs' 		=> array('caption'=> LAN_PREFS, 'perm' => 'A'),
-		'main/avatar'		=> array('caption'=> LAN_IMA_M_05, 'perm' => 'A')
+		'divider/02'        => array('divider'=>true, 'perm'=>'0'),
+		'main/prefs' 		=> array('caption'=> LAN_PREFS, 'perm' => '0'),
+		'main/avatar'		=> array('caption'=> LAN_IMA_M_05, 'perm' => '0')
 	);
 
 	protected $adminMenuIcon = 'e-images-24';
@@ -1159,7 +1166,7 @@ class media_admin_ui extends e_admin_ui
 			$this->batchDelete();
 		}
 
-		if(varset($_POST['update_options']))
+		if(!empty($_POST['update_options']))
 		{
 			$this->updateSettings();
 		}
@@ -3067,7 +3074,7 @@ class media_admin_ui extends e_admin_ui
 			$text .= "</div>
 
 			<div class='col-md-12 spacer clearfix'>
-				<div class='row buttons-bar'>
+				<div class='buttons-bar'>
 					<input type='hidden' name='show_avatars' value='1' />
 					".$frm->admin_button('e_check_all', LAN_CHECKALL, 'action'). '
 					' .$frm->admin_button('e_uncheck_all', LAN_UNCHECKALL, 'action'). '

@@ -110,6 +110,10 @@ if(isset($_POST['updateprefs']))
 
 	$pref['post_html'] = intval($_POST['post_html']);			// This ensures the setting is reflected in set text
 
+	if(isset($_POST['contact_info']) && is_array($_POST['contact_info']))
+	{
+		$core_pref->set('contact_info', []); // reset to type array if string had been used in the past. 
+	}
 
 	$smtp_opts = array();
 
@@ -358,7 +362,7 @@ $text = "
 						<td><label for='siteurl'>".PRFLAN_3."</label>
 						".($pref['siteurl'] == SITEURL ? "" : $frm->help(PRFLAN_159.": <strong>".SITEURL."</strong>"))."</td>
 						<td>
-							".$frm->text('siteurl', $pref['siteurl'], 150, 'size=xxlarge')."
+							".$frm->text('siteurl', $pref['siteurl'], 150, ['size'=>'xxlarge', 'required'=>1, 'pattern' => '^http.*', 'placeholder'=>'eg. '.SITEURL])."
 						</td>
 					</tr>
 					<tr>

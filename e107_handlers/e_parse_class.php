@@ -254,8 +254,6 @@ class e_parse
 	private $bootstrap;
 	private $fontawesome;
 
-	private $modRewriteMedia;
-
 	private $removedList      = array();
 	private $nodesToDelete    = array();
 	private $nodesToConvert   = array();
@@ -2489,6 +2487,7 @@ class e_parse
 	 */
 	public function setStaticUrl($url)
 	{
+
 		$this->staticUrl = $url;
 	}
 
@@ -2637,10 +2636,10 @@ class e_parse
 		}
 
 
-		if ($this->modRewriteMedia && empty($options['nosef']))//  SEF URL support.
+		if (e_MOD_REWRITE_MEDIA == true && empty($options['nosef']))// Experimental SEF URL support.
 		{
 			$options['full'] = $full;
-			$options['ext'] = pathinfo($url, PATHINFO_EXTENSION);
+			$options['ext'] = substr($url, -3);
 			$options['thurl'] = $thurl;
 			//	$options['x'] = $this->thumbEncode();
 
@@ -3607,9 +3606,8 @@ class e_parse
 		if (defined('BOOTSTRAP'))
 		{
 			$this->bootstrap = (int) BOOTSTRAP;
-		}
 
-		$this->modRewriteMedia = deftrue('e_MOD_REWRITE_MEDIA');
+		}
 
 		if (defined('e_HTTP_STATIC'))
 		{
@@ -3783,6 +3781,7 @@ class e_parse
 	 */
 	public function setFontAwesome($version)
 	{
+
 		$this->fontawesome = (int) $version;
 	}
 
@@ -3791,13 +3790,10 @@ class e_parse
 	 */
 	public function setBootstrap($version)
 	{
+
 		$this->bootstrap = (int) $version;
 	}
 
-	public function setmodRewriteMedia($bool)
-	{
-		$this->modRewriteMedia = (bool) $bool;
-	}
 
 	/**
 	 * Add leading zeros to a number. eg. 3 might become 000003
@@ -4332,10 +4328,21 @@ class e_parse
 
 		if (!empty($options['base64'])) // embed image data into URL.
 		{
-			$content = e107::getFile()->getRemoteContent($url); // returns false during unit tests, works otherwise.
+			$content = '';
+
+			if(!empty($file))
+			{
+				$content = file_get_contents($file);
+				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+			}
+			else
+			{
+				$content = e107::getFile()->getRemoteContent($url);
+				$ext = strtolower(pathinfo($url, PATHINFO_EXTENSION));
+			}
+
 			if (!empty($content))
 			{
-				$ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 				$url = 'data:image/' . $ext . ';base64,' . base64_encode($content);
 			}
 		}
@@ -4853,7 +4860,27 @@ class e_parse
 
 		$file = $this->replaceConstants($file, 'abs');
 
-		$mime = varset($parm['mime'], 'audio/mpeg');
+	    $ext = pathinfo($file, PATHINFO_EXTENSION);
+
+	    switch (strtolower($ext))
+	    {
+
+	        case 'wav':
+	            $mime = 'audio/wav';
+	            break;
+	        case 'ogg':
+	            $mime = 'audio/ogg';
+	            break;
+	        case 'mp3':
+	        default:
+	             $mime = 'audio/mpeg';
+	            break;
+	    }
+
+		if(!empty($parm['mime']))
+		{
+			$mime = $parm['mime'];
+		}
 
 		$autoplay = !empty($parm['autoplay']) ? 'autoplay ' : '';
 		$controls = !empty($parm['controls']) ? 'controls' : '';
@@ -5013,6 +5040,11 @@ class e_parse
 			$width = varset($parm['w'], 320);
 			$height = varset($parm['h'], 240);
 			$mime = varset($parm['mime'], 'video/mp4');
+
+			if($height === 0)
+			{
+				$height = 'auto';
+			}
 
 			return '
 			<div class="video-responsive">
@@ -5435,6 +5467,13 @@ class e_parse
 		}
 
 
+		// Normalize HTML5 void elements so serialization is identical
+		// across libxml versions. libxml < 2.13 treated elements like
+		// <source> as non-void and swallowed following text as their
+		// content; the HTML5-spec-compliant output keeps such text as
+		// a sibling and omits any closing tag.
+		$this->normalizeVoidElements($doc);
+
 		// Convert <code> and <pre> Tags to Htmlentities.
 		/* TODO XXX Still necessary? Perhaps using bbcodes only?
 		foreach($this->nodesToConvert as $node)
@@ -5466,6 +5505,8 @@ class e_parse
 
 		$cleaned = $doc->saveHTML($doc->documentElement); // $doc->documentElement fixes utf-8/entities issue. @see http://stackoverflow.com/questions/8218230/php-domdocument-loadhtml-not-encoding-utf-8-correctly
 
+		$cleaned = $this->stripVoidClosingTags($cleaned);
+
 		$cleaned = str_replace(
 			array("\n", '__E_PARSER_CLEAN_HTML_LINE_BREAK__', '__E_PARSER_CLEAN_HTML_NON_BREAKING_SPACE__', '{{{', '}}}', '__E_PARSER_CLEAN_HTML_CURLY_OPEN__', '__E_PARSER_CLEAN_HTML_CURLY_CLOSED__', '<body>', '</body>', '<html>', '</html>'),
 			array('', "\n", '&nbsp;', '&#123;', '&#125;', '{', '}', '', '', '', ''),
@@ -5473,6 +5514,81 @@ class e_parse
 		); // filter out tags.
 
 		return trim($cleaned);
+	}
+
+	/**
+	 * HTML5 void elements that may not have a closing tag.
+	 *
+	 * @var string[]
+	 */
+	private static $voidTags = array(
+		'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+		'link', 'meta', 'source', 'track', 'wbr',
+	);
+
+	/**
+	 * Move children out of HTML5 void elements and into sibling positions.
+	 *
+	 * Older libxml2 (< 2.13) parses elements like <source> as non-void and
+	 * sucks up following content as the element's child nodes. Newer libxml2
+	 * correctly treats them as void. Running this pass before serialization
+	 * normalizes the DOM so saveHTML() output is spec-compliant on every
+	 * libxml version.
+	 *
+	 * @param DOMDocument $doc
+	 * @return void
+	 */
+	private function normalizeVoidElements($doc)
+	{
+		$voidTags = self::$voidTags;
+
+		foreach ($voidTags as $tagName)
+		{
+			$nodes = $doc->getElementsByTagName($tagName);
+			$toFix = array();
+			foreach ($nodes as $node)
+			{
+				if ($node->hasChildNodes())
+				{
+					$toFix[] = $node;
+				}
+			}
+
+			foreach ($toFix as $node)
+			{
+				$parent = $node->parentNode;
+				$after = $node->nextSibling;
+				while ($node->hasChildNodes())
+				{
+					$child = $node->firstChild;
+					$node->removeChild($child);
+					if ($after === null)
+					{
+						$parent->appendChild($child);
+					}
+					else
+					{
+						$parent->insertBefore($child, $after);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Strip empty closing tags for HTML5 void elements from a serialized
+	 * HTML string. libxml2 < 2.13 emits a closing `</source>` etc. for any
+	 * element it does not recognize as void; once `normalizeVoidElements()`
+	 * has moved their children out, the closing tag is always empty and
+	 * safe to remove.
+	 *
+	 * @param string $html
+	 * @return string
+	 */
+	private function stripVoidClosingTags($html)
+	{
+		$pattern = '#</(?:' . implode('|', self::$voidTags) . ')>#i';
+		return preg_replace($pattern, '', $html);
 	}
 
 	/**
